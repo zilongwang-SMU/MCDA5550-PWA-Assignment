@@ -146,3 +146,8 @@ body {
 .offline {
   color: #d63031;
 }
+
+.green  { background-color: #55efc4; }
+.yellow { background-color: #ffeaa7; }
+.orange { background-color: #fab1a0; }
+.red    { background-color: #ff7675; }

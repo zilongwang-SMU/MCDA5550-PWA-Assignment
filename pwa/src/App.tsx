@@ -1,32 +1,44 @@
 import "./App.css";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type Task = {
   id: string;
   text: string;
-  date: string; // "YYYY-MM-DD"
+  date: string; // YYYY-MM-DD or ""
 };
 
 function App() {
-  const [taskText, setTaskText] = useState<string>("");
-  const [taskDate, setTaskDate] = useState<string>("");
-  const [tasks, setTasks] = useState<Task[]>([
-    { id: "1", text: "Buy groceries", date: "2026-06-05" },
-    { id: "2", text: "Schedule a meeting", date: "2026-01-22" },
-    { id: "3", text: "Submit assignment", date: "2026-05-20" },
-  ]);
+  //  Load tasks safely from localStorage (prevents refresh wipe)
+  const [tasks, setTasks] = useState<Task[]>(() => {
+    const stored = localStorage.getItem("tasks");
+    return stored ? (JSON.parse(stored) as Task[]) : [];
+  });
+
+  const [taskText, setTaskText] = useState("");
+  const [taskDate, setTaskDate] = useState("");
+
+  //  Compute nextId from existing tasks
+  const nextId = useMemo(() => {
+    if (tasks.length === 0) return 1;
+    const maxId = Math.max(...tasks.map((t) => Number(t.id) || 0));
+    return maxId + 1;
+  }, [tasks]);
+
+  //  Persist tasks
+  useEffect(() => {
+    localStorage.setItem("tasks", JSON.stringify(tasks));
+  }, [tasks]);
 
   const addTask = () => {
-    // basic validation
     if (!taskText.trim()) return;
 
     const newTask: Task = {
-      id: crypto.randomUUID(), // modern unique id
+      id: String(nextId),
       text: taskText.trim(),
-      date: taskDate, // can be empty if user didn't pick
+      date: taskDate,
     };
 
-    setTasks((prev) => [newTask, ...prev]); // add to top
+    setTasks((prev) => [newTask, ...prev]);
     setTaskText("");
     setTaskDate("");
   };
@@ -35,24 +47,22 @@ function App() {
     setTasks((prev) => prev.filter((t) => t.id !== id));
   };
 
-  const formatDate = (date: string) => {
-    if (!date) return "No due date";
-    return date; // keep simple; you can beautify later
-  };
+  const formatDue = (date: string) => (date ? date : "No date");
 
-  // OPTIONAL: simple color based on due date
+  //  FINAL deadline color logic
   const getTaskColorClass = (date: string) => {
-    if (!date) return "yellow";
+    if (!date) return "green"; // no deadline = safe
+
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     const due = new Date(date + "T00:00:00");
+    const diffDays = Math.floor((due.getTime() - today.getTime()) / 86400000);
 
-    const diffDays = Math.ceil(
-      (due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
-    );
-
-    if (diffDays <= 0) return "red";
-    if (diffDays <= 3) return "orange";
-    return "yellow";
+    if (diffDays < 0) return "red"; //  passed
+    if (diffDays < 3) return "orange"; //  < 3 days
+    if (diffDays <= 7) return "yellow"; //  within a week
+    return "green"; //  more than a week
   };
 
   return (
@@ -75,13 +85,11 @@ function App() {
             value={taskText}
             onChange={(e) => setTaskText(e.target.value)}
           />
-
           <input
             type="date"
             value={taskDate}
             onChange={(e) => setTaskDate(e.target.value)}
           />
-
           <button onClick={addTask}>Add Task</button>
         </div>
       </section>
@@ -99,7 +107,7 @@ function App() {
               className={`task-item ${getTaskColorClass(task.date)}`}
             >
               <span>
-                {task.text} (Due: {formatDate(task.date)})
+                {task.text} (Due: {formatDue(task.date)})
               </span>
               <button onClick={() => deleteTask(task.id)}>Delete</button>
             </div>
